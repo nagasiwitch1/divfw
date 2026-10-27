@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>divfw 배당 워크벤치</title>
+<meta name="description" content="한국 상장기업 예상배당 워크벤치 — 과거 배당흐름, 공시된 배당정책, 이익 가정으로 향후 3개년 주당배당금과 배당수익률을 계산합니다.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font:14px system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<style>
+/* 레이아웃: 좌측 종목 검색 레일 + 우측 3단(과거·정책·추정) 원장(ledger) */
+:root{
+  --paper:#f7f5f1; --card:#fffefb; --ink:#1b1a17; --ink-2:#5d584e; --ink-3:#8d8678;
+  --rule:#ddd8ce; --rule-2:#efebe3;
+  --accent:#1f5f6b; --accent-soft:#e3eef0; --accent-ink:#0e3b44;
+  --good:#1d6b3f; --warn:#8a5a10; --crit:#9a2f25;
+  --f-disp:'Bitter',Georgia,serif;
+  --f-body:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#15171a; --card:#1c1f23; --ink:#e8e4dc; --ink-2:#a8a49b; --ink-3:#787469;
+  --rule:#2e3338; --rule-2:#24282c;
+  --accent:#6fb3c0; --accent-soft:#1d2e33; --accent-ink:#a8d6df;
+  --good:#6cc08a; --warn:#d9a94e; --crit:#e38a80; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --paper:#15171a; --card:#1c1f23; --ink:#e8e4dc; --ink-2:#a8a49b; --ink-3:#787469;
+  --rule:#2e3338; --rule-2:#24282c;
+  --accent:#6fb3c0; --accent-soft:#1d2e33; --accent-ink:#a8d6df;
+  --good:#6cc08a; --warn:#d9a94e; --crit:#e38a80; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55;margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 56px}
+h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+/* 헤더 */
+header{border-bottom:1px solid var(--rule);padding-block:18px 14px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline}
+.brand{font-family:var(--f-disp);font-weight:700;font-size:21px;letter-spacing:-.01em}
+.brand span{color:var(--accent)}
+.tag{font-size:11.5px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+.hdr-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+button{font-family:inherit;font-size:13px;cursor:pointer;border:1px solid var(--rule);background:var(--card);color:var(--ink);border-radius:5px;padding:6px 11px}
+button:hover{border-color:var(--accent)}
+button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] button.pri{color:#0e1416}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) button.pri{color:#0e1416}}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* 검색 */
+.search{position:relative;margin-block:22px 8px}
+.search input{width:100%;font-family:var(--f-mono);font-size:16px;padding:13px 14px;border:1px solid var(--rule);border-radius:7px;background:var(--card);color:var(--ink)}
+.search input::placeholder{color:var(--ink-3);font-family:var(--f-body)}
+.ac{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--rule);border-radius:7px;max-height:320px;overflow:auto;box-shadow:0 10px 28px rgba(0,0,0,.14)}
+.ac div{padding:8px 13px;display:flex;gap:12px;align-items:baseline;cursor:pointer;border-bottom:1px solid var(--rule-2)}
+.ac div:last-child{border-bottom:0}
+.ac div[aria-selected="true"],.ac div:hover{background:var(--accent-soft)}
+.ac b{font-weight:500}
+.ac .c{font-family:var(--f-mono);font-size:12px;color:var(--ink-3)}
+.ac .m{margin-left:auto;font-size:11.5px;color:var(--accent);letter-spacing:.04em}
+.hint{font-size:12.5px;color:var(--ink-3)}
+
+/* 종목 헤드 */
+.stock{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-block:26px 4px}
+.stock h1{font-size:26px}
+.stock .code{font-family:var(--f-mono);color:var(--ink-3);font-size:15px}
+.chip{font-size:11.5px;padding:2.5px 8px;border-radius:99px;border:1px solid var(--rule);color:var(--ink-2);letter-spacing:.03em}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+
+/* 섹션 */
+section{margin-top:30px}
+.sh{display:flex;gap:10px;align-items:baseline;border-bottom:1px solid var(--rule);padding-bottom:7px;margin-bottom:14px}
+.sh .n{font-family:var(--f-mono);font-size:12px;color:var(--accent);font-weight:600}
+.sh h2{font-size:16.5px}
+.sh .sub{margin-left:auto;font-size:12px;color:var(--ink-3)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--rule-2);white-space:nowrap}
+th{font-size:11.5px;letter-spacing:.04em;color:var(--ink-3);font-weight:500;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:left}
+td.num,th.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tbody tr:hover{background:var(--rule-2)}
+.scroll{overflow-x:auto;border:1px solid var(--rule);border-radius:8px;background:var(--card)}
+.scroll table{min-width:620px}
+.neg{color:var(--crit)}
+.muted{color:var(--ink-3)}
+
+/* 정책 카드 */
+.pol{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:15px 16px}
+.pol .eng{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.pol .eng label{font-size:12.5px;border:1px solid var(--rule);border-radius:6px;padding:6px 10px;cursor:pointer;display:flex;gap:7px;align-items:center;background:var(--paper)}
+.pol .eng label.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+.pol .eng input{accent-color:var(--accent)}
+blockquote{margin:0 0 12px;padding:10px 14px;border-left:3px solid var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-size:13px;border-radius:0 6px 6px 0}
+blockquote p{margin:0 0 6px}blockquote p:last-child{margin:0}
+.src{font-size:11.5px;color:var(--ink-3);margin-top:8px}
+.src a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--rule)}
+.src a:hover{border-color:var(--accent)}
+
+/* 입력 그리드 */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(166px,1fr));gap:12px 14px}
+.fld{min-width:0;display:flex;flex-direction:column;gap:4px}
+.fld label{font-size:11.5px;color:var(--ink-3);letter-spacing:.03em}
+.fld input,.fld select{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:14px;padding:7px 9px;border:1px solid var(--rule);border-radius:5px;background:var(--paper);color:var(--ink);width:100%}
+.fld .u{font-size:11px;color:var(--ink-3);font-family:var(--f-body)}
+.fs{border:1px solid var(--rule);border-radius:8px;background:var(--card);padding:14px 16px;margin-bottom:14px}
+.fs > h3{font-size:13px;letter-spacing:.03em;color:var(--ink-2);margin-bottom:11px;font-family:var(--f-body);font-weight:600}
+
+/* 결과 */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-bottom:14px}
+.kpi{border:1px solid var(--rule);border-radius:8px;padding:12px 14px;background:var(--card)}
+.kpi .k{font-size:11.5px;color:var(--ink-3);letter-spacing:.03em}
+.kpi .v{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:25px;font-weight:500;line-height:1.15;margin-top:3px}
+.kpi .s{font-size:11.5px;color:var(--ink-2);margin-top:2px;font-family:var(--f-mono)}
+.band{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:6px;vertical-align:1px}
+.b-lo{background:var(--ink-3)}.b-mid{background:var(--warn)}.b-hi{background:var(--good)}
+details{border:1px solid var(--rule);border-radius:8px;background:var(--card);padding:0 14px;margin-top:14px}
+details summary{cursor:pointer;padding:11px 0;font-size:13px;font-weight:600;color:var(--ink-2)}
+details[open] summary{border-bottom:1px solid var(--rule-2);margin-bottom:12px}
+details .inner{padding-bottom:14px}
+code{font-family:var(--f-mono);font-size:12px;background:var(--rule-2);padding:1.5px 5px;border-radius:3px}
+pre{font-family:var(--f-mono);font-size:12px;background:var(--rule-2);padding:11px 13px;border-radius:6px;overflow-x:auto;margin:8px 0 0}
+.warnbox{border:1px solid var(--rule);border-left:3px solid var(--warn);border-radius:0 6px 6px 0;padding:10px 14px;background:var(--card);font-size:12.5px;color:var(--ink-2);margin-top:12px}
+footer{margin-top:44px;border-top:1px solid var(--rule);padding-top:14px;font-size:12px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:6px 18px}
+@media(max-width:560px){.stock h1{font-size:21px}.kpi .v{font-size:21px}}
+</style>
+
+<div class="wrap">
+<header>
+  <div>
+    <div class="brand">div<span>fw</span></div>
+    <div class="tag">Korean dividend forecast workbench</div>
+  </div>
+  <div class="hdr-right">
+    <button id="theme" title="테마 전환">◐ 테마</button>
+  </div>
+</header>
+
+<div class="search">
+  <input id="q" autocomplete="off" spellcheck="false" placeholder="종목코드 또는 기업명 — 005930, 한국금융지주, SK …" aria-label="종목 검색">
+  <div class="ac" id="ac" hidden></div>
+</div>
+<p class="hint" id="hint">데이터셋 1,068 종목 · DART 확인 프로파일 <b id="pcount">4</b>건</p>
+
+<div id="app" hidden>
+  <div class="stock">
+    <h1 id="sName">—</h1>
+    <span class="code" id="sCode"></span>
+    <span class="chip" id="sEng"></span>
+    <span class="chip" id="sProf"></span>
+  </div>
+
+  <section>
+    <div class="sh"><span class="n">01</span><h2>과거 배당흐름</h2><span class="sub" id="histSub">보유 데이터셋 2021–2025</span></div>
+    <div class="scroll"><table>
+      <thead><tr><th>구분</th><th class="num">2021</th><th class="num">2022</th><th class="num">2023</th><th class="num">2024</th><th class="num">2025</th></tr></thead>
+      <tbody id="histBody"></tbody>
+    </table></div>
+    <div class="warnbox" id="histNote" hidden></div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">02</span><h2>공시된 배당정책</h2><span class="sub">정책 유형에 따라 계산식이 달라집니다</span></div>
+    <div class="pol">
+      <div class="eng" id="engPick"></div>
+      <div id="polBody"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">03</span><h2>가정 입력</h2><span class="sub" id="asmSub"></span></div>
+    <div id="asm"></div>
+  </section>
+
+  <section>
+    <div class="sh"><span class="n">04</span><h2>예상 배당금 · 배당수익률</h2><span class="sub" id="resSub"></span></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="scroll"><table>
+      <thead><tr><th>사업연도</th><th class="num">산출 기준</th><th class="num">배당총액</th><th class="num">보통주 DPS</th><th class="num">보통주 수익률</th><th class="num">우선주 DPS</th><th class="num">우선주 수익률</th></tr></thead>
+      <tbody id="resBody"></tbody>
+    </table></div>
+
+    <details id="sensWrap"><summary>민감도 — 핵심 변수 1개를 흔들어 봅니다</summary>
+      <div class="inner"><div class="scroll"><table>
+        <thead><tr id="sensHead"></tr></thead><tbody id="sensBody"></tbody>
+      </table></div><p class="hint" id="sensNote" style="margin:10px 0 0"></p></div>
+    </details>
+
+    <details><summary>DART 원문 확인 · 모델 스크립트</summary>
+      <div class="inner" id="verify"></div>
+    </details>
+  </section>
+</div>
+
+<footer>
+  <span>과거 배당: DART 사업보고서 「배당에 관한 사항」 기준으로 정리한 보유 데이터셋</span>
+  <span>주가는 직접 입력 — 브라우저에서 거래소·DART API를 직접 호출할 수 없습니다</span>
+</footer>
+</div>
+
+<script>
+/* ───────── 테마 ───────── */
+(function(){
+  var r=document.documentElement;
+  try{var t=localStorage.getItem('divfw.theme'); if(t) r.setAttribute('data-theme',t);}catch(e){}
+  document.getElementById('theme').onclick=function(){
+    var cur=r.getAttribute('data-theme');
+    var dark=cur?cur==='dark':matchMedia('(prefers-color-scheme:dark)').matches;
+    var next=dark?'light':'dark';
+    r.setAttribute('data-theme',next);
+    try{localStorage.setItem('divfw.theme',next);}catch(e){}
+  };
+})();
+
+/* ───────── 숫자 유틸 ───────── */
+var EOK=1e8;                         // 1억
+function fmt(v,d){ if(v==null||!isFinite(v))return '—'; return v.toLocaleString('ko-KR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0}); }
+function pct(v,d){ if(v==null||!isFinite(v))return '—'; return v.toFixed(d==null?2:d)+'%'; }
+function eok(won){ return won/EOK; }
+function band(y){ return y>=5?'b-hi':y>=2.5?'b-mid':'b-lo'; }
+
+/* ───────── 정책 엔진 ─────────
+   payout : DPS = 배당성향 × 지배주주순이익 / 배당대상주식수
+   pool   : DPS = 약정 배당총액 / 배당대상주식수
+   floor  : DPS = 주당 하한 + (시가총액 × 환원율 × 현금배당비중) / 배당대상주식수
+   fcf    : FCF = 순이익 × 영업CF배수 − CAPEX ; DPS = FCF × 환원율 × 현금비중 / 주식수
+*/
+var ENGINES={
+  payout:{label:'배당성향형',hint:'공시된 배당성향(또는 과거 추세)에 이익을 곱한다',
+          basis:function(a,y){return '성향 '+a.payout[y].toFixed(1)+'%';}},
+  pool  :{label:'배당총액 약정형',hint:'연간 총액을 약정 — 이익이 늘어도 DPS는 주식수로만 움직인다',
+          basis:function(a,y){return '총액 '+a.pool[y]+'조';}},
+  floor :{label:'DPS 하한 + 시총연동형',hint:'주당 최소배당 + 시가총액 일정 비율을 추가환원',
+          basis:function(a,y){return '하한 '+fmt(a.dpsFloor)+'원 +시총 '+a.mcPct[y]+'%';}},
+  fcf   :{label:'FCF 비율형',hint:'영업현금흐름 − CAPEX의 일정 비율을 환원',
+          basis:function(a,y){return 'FCF '+a.fcfPct[y]+'%';}}
+};
+
+function compute(a){
+  var out=[];
+  for(var i=0;i<3;i++){
+    var totWon=0, b='';
+    if(a.engine==='payout'){
+      totWon=(a.ni[i]*EOK)*(a.payout[i]/100); b=ENGINES.payout.basis(a,i);
+    }else if(a.engine==='pool'){
+      totWon=a.pool[i]*1e12; b=ENGINES.pool.basis(a,i);
+    }else if(a.engine==='floor'){
+      totWon=a.dpsFloor*a.shares + a.mcap*1e8*(a.mcPct[i]/100)*(a.cash[i]/100);
+      b=ENGINES.floor.basis(a,i);
+    }else{
+      var ocf=a.ni[i]*a.ocfMult, fcf=(ocf-a.capex[i])*EOK;
+      totWon=fcf*(a.fcfPct[i]/100)*(a.cash[i]/100); b=ENGINES.fcf.basis(a,i);
+    }
+    if(!isFinite(totWon)||totWon<0) totWon=0;
+    var dpsC=totWon/a.shares, dpsP=dpsC+a.prem;
+    out.push({year:a.y0+i, total:totWon, dpsC:dpsC, dpsP:dpsP,
+      yC:a.pxC>0?dpsC/a.pxC*100:null, yP:a.pxP>0?dpsP/a.pxP*100:null,
+      basis:b, ni:a.ni[i]});
+  }
+  return out;
+}
+
+/* ───────── 프로파일 (이 세션에서 DART로 확인한 종목) ───────── */
+var PROFILES={
+'071050':{name:'한국금융지주',engine:'payout',shares:58407580,prem:62,pxC:161600,pxP:133100,pxDate:'2026-10-13',
+  prefCode:'071055',prefName:'한국금융지주우',
+  ni:[28662,19108,19108],payout:[25.1,25.1,25.1],
+  halfNi:19108, halfLabel:'2026년 반기 누적 지배주주순이익 1조 9,108억원',
+  policy:[
+    ['2026-04-29','기업가치제고계획(자율공시)','2030년 ROE 15% 이상 · 자기자본 15조원 이상. 이행현황 ROE 11.5→18.5%, 자기자본 9.7→12.1조, 배당성향 22.4→25.1%. 조세특례제한법상 고배당기업 해당.','20260429800936'],
+    ['2026-02-11','현금ㆍ현물배당결정','보통주 8,690원 / 우선주 8,751.5원, 배당금총액 5,078억원 (전년 대비 +118.2%)','20260211801115'],
+    ['2026-03-19','사업보고서(2025.12) 배당정책','“현재의 배당 기조를 유지하며 지속적으로 안정적인 배당을 지급” · “공시일 현재 자사주 매입 및 소각 관련 계획은 없음”','20260319001006']],
+  verdict:'배당성향을 5년 연속 올렸습니다(20.4→25.1%). DPS를 고정하지 않고 성향으로 관리하는 전형적인 배당성향형입니다. 숫자로 약속된 성향 목표는 없어, 최근 실적치 25.1%를 기준값으로 둡니다.',
+  target:{label:'회사 공시 목표 역산',text:'자기자본 목표 15조 × ROE 목표 10%p 상향분 15% = 목표 순이익 2.25조원. 배당성향 25.1% 적용 시 배당총액 5,648억원, DPS 9,669원.',ni:22500}},
+'005930':{name:'삼성전자',engine:'pool',shares:6511922712,prem:1,pxC:232000,pxP:174300,pxDate:'2026-10-13',
+  prefCode:'005935',prefName:'삼성전자우',
+  pool:[9.8,9.8,9.8],ni:[2367413,1775560,1538819],
+  halfNi:1183707, halfLabel:'2026년 반기 누적 지배주주순이익 118조 3,707억원',
+  policy:[
+    ['2026-01-29','현금ㆍ현물배당결정(결산)','“2024년부터 2026년까지 3년간 주주환원 정책상 정규배당의 연간 총액은 9.8조원, 분기당 2.45조원임. 금번 결산배당은 … 정기 분기배당금에 1.3조원을 추가하여 총 3.75조원으로 이사회가 정함.”','20260129800004'],
+    ['2026-03-19','기업가치제고계획(자율공시)','4기 주주환원 정책: 3년간 총 Free Cash Flow의 50% 중 ’24~’25년 주주환원 및 ’26년 정규배당(9.8조원) 이후 잔여재원 발생 시 추가 환원. ’24~’25년 현금배당 20.9조 + 소각 목적 자사주 매입 8.4조.','20260319801333'],
+    ['2026-10-12','자기주식취득결과보고서','15조원 자사주 매입을 10/06 체결 완료(목적: 임직원 주식보상, 소각 아님). 취득 후 자기주식 보통주 136,727,099주(2.34%).','20261012000421']],
+  verdict:'순이익이 14조에서 55조까지 움직인 2021–2023년 내내 DPS가 1,444원에 고정돼 있었습니다. 배당성향 모델이 작동하지 않는 총액 약정형입니다. 2026년 분기배당 실적은 1Q 372원 / 2Q 374원으로 분기 2.45조 약정과 일치합니다.',
+  extra:'잔여재원 추정: FY24 FCF 19.2조 + FY25 33.2조 + FY26 추정 191~225조 → 3년 누적 243~277조의 50% = 122~139조. 기집행 39.1조를 빼면 잔여 83~99조. 이 재원을 현금배당으로 돌리는 비율이 FY2026 배당의 전부입니다.'},
+'034730':{name:'SK',engine:'floor',shares:55106236,prem:50,pxC:463000,pxP:353500,pxDate:'2026-10-26',
+  prefCode:'03473K',prefName:'SK우',
+  dpsFloor:5000,mcPct:[1.5,1.5,1.5],cash:[50,50,50],mcap:337700,
+  ni:[17481,17481,17481],
+  halfNi:13447, halfLabel:'2026년 반기 별도 순이익 1조 3,447억원 (배당 재원)',
+  policy:[
+    ['2024-10-28','기업가치제고계획(자율공시)','주주환원 정책 변경(FY24~FY26): 연간 주당 최소 배당금 5천원 설정(보통주 기준). 자산 매각 이익 등을 활용하여 매년 시가총액의 1~2% 규모의 자기주식 매입·소각 또는 정기배당 시 추가 배당 지급. 목표 ROE ’24~’26 8% / ’27년 이후 10%, PBR 0.7배 / 1배.','20241028800593'],
+    ['2026-03-27','기업가치제고계획 재공시','고배당기업 요건 충족으로 재공시. “연내 기존 기업가치 제고 계획의 이행 평가 및 변경된 기업가치 제고 계획을 수립하여 공시할 예정”','20260327802307'],
+    ['2026-03-10','주식소각결정','보통주 14,692,601주 + 우선주 1,787주 소각(소각예정일 2027-01-04). 보유 자기주식 17,982,486주 중 임직원 보상용 3,288,098주를 제외한 전량.','20260310801475']],
+  verdict:'2023·2024년 2년 연속 연결 적자였는데도 배당을 5,000원 → 7,000원으로 올렸습니다. 배당성향으로는 설명이 안 되고, 공시된 DPS 하한 5,000원 + 시가총액 1~2% 추가환원으로 읽어야 합니다.',
+  extra:'FY24~26 정책이 올해로 끝나고 새 정책이 연내 공시 예정입니다. 직전 계획이 2024년 10월 28일 공시였습니다. 또 2027-01-04 소각이 집행되면 발행주식총수가 20% 줄어 시총 연동 추가환원의 기준 금액도 함께 줄어듭니다.',
+  target:{label:'회사 공시 목표 역산',text:'지배주주지분 자본 37.2조 × ROE 목표 10% = 목표 순이익 3.72조원. 배당성향 27.6%(FY2025 실적치) 적용 시 배당총액 1.03조원, DPS 18,629원.',ni:37200,payout:27.6}}
+};
+PROFILES['005935']=Object.assign({},PROFILES['005930'],{isPref:true});
+PROFILES['071055']=Object.assign({},PROFILES['071050'],{isPref:true});
+PROFILES['03473K']=Object.assign({},PROFILES['034730'],{isPref:true});
+document.getElementById('pcount').textContent=Object.keys(PROFILES).length;
+
+/* ───────── 데이터셋 ───────── */
+var STOCKS=[],BYCODE={};
+fetch('stocks.json').then(function(r){return r.json()}).then(function(j){
+  STOCKS=j; j.forEach(function(s){ if(s.c) BYCODE[s.c]=s; });
+  var nd=0; j.forEach(function(x){ if(x.d) nd++; });
+  document.getElementById('hint').innerHTML='상장 <b>'+fmt(STOCKS.length)+'</b> 종목 검색 · 2021–2025 배당이력 보유 <b>'+fmt(nd)+'</b>종목 · DART 공시 확인 프로파일 <b>'+Object.keys(PROFILES).length+'</b>건';
+  var h=location.hash.replace(/^#/,'');
+  if(/^[0-9A-Z]{6}$/.test(h)) select(h); else select('071050');
+}).catch(function(){
+  document.getElementById('hint').textContent='데이터셋을 불러오지 못했습니다. 페이지를 새로고침해 주세요.';
+});
+
+/* ───────── 검색 ───────── */
+var q=document.getElementById('q'),ac=document.getElementById('ac'),acIdx=-1,acRows=[];
+function nz(x){ return (x||'').toUpperCase().replace(/\s|-/g,''); }
+function searchStocks(t){
+  t=t.trim(); if(!t) return [];
+  var up=t.toUpperCase(), q=nz(t), hits=[];
+  // 데이터셋에 없는 프로파일(우선주 등)도 항상 후보에 넣는다
+  var extra=[];
+  Object.keys(PROFILES).forEach(function(c){
+    if(BYCODE[c]) return;
+    var p=PROFILES[c], nm=p.isPref?p.prefName:p.name;
+    extra.push({c:c,n:nm});
+  });
+  var pool=extra.concat(STOCKS);
+  for(var i=0;i<pool.length;i++){
+    var s=pool[i], n=nz(s.n), a=nz(s.a), rank=99;
+    if(s.c===up) rank=-2;
+    else if(n===q||a===q) rank=-1;            // 이름/별칭 정확히 일치
+    else if(s.c&&s.c.indexOf(up)===0) rank=0;
+    else if(n.indexOf(q)===0) rank=1;
+    else if(a&&a.indexOf(q)===0) rank=1;
+    else if(n.indexOf(q)>=0) rank=3;
+    else if(a&&a.indexOf(q)>=0) rank=3;
+    if(rank>50) continue;
+    if(PROFILES[s.c]) rank-=0.5;              // DART 프로파일이 있으면 먼저
+    else if(s.d) rank-=0.25;                  // 배당이력이 있으면 그 다음
+    hits.push({s:s,r:rank,len:s.n.length});
+    if(hits.length>400) break;
+  }
+  hits.sort(function(x,y){ return x.r-y.r || x.len-y.len; });
+  var seen={},o=[];
+  hits.forEach(function(h){ var k=h.s.c||h.s.n; if(!seen[k]){seen[k]=1;o.push(h.s);} });
+  return o.slice(0,24);
+}
+function renderAc(rows){
+  acRows=rows; acIdx=-1;
+  if(!rows.length){ac.hidden=true;ac.innerHTML='';return;}
+  ac.innerHTML=rows.map(function(s,i){
+    var has=PROFILES[s.c]?'<span class="m">DART 프로파일</span>':
+            (s.d&&Object.keys(s.d).length?'<span class="m" style="color:var(--ink-3)">배당이력 '+Object.keys(s.d).length+'년</span>':
+             '<span class="m" style="color:var(--ink-3)">배당이력 없음</span>');
+    var alias=s.a?' <span class="c">('+s.a+')</span>':'';
+    return '<div role="option" data-i="'+i+'"><span class="c">'+(s.c||'——————')+'</span><b>'+s.n+'</b>'+alias+has+'</div>';
+  }).join('');
+  ac.hidden=false;
+}
+q.addEventListener('input',function(){renderAc(searchStocks(q.value))});
+q.addEventListener('focus',function(){if(q.value)renderAc(searchStocks(q.value))});
+q.addEventListener('keydown',function(e){
+  if(ac.hidden)return;
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    e.preventDefault(); acIdx+=e.key==='ArrowDown'?1:-1;
+    if(acIdx<0)acIdx=acRows.length-1; if(acIdx>=acRows.length)acIdx=0;
+    [].forEach.call(ac.children,function(c,i){c.setAttribute('aria-selected',i===acIdx)});
+    ac.children[acIdx].scrollIntoView({block:'nearest'});
+  }else if(e.key==='Enter'){
+    e.preventDefault(); var s=acRows[acIdx<0?0:acIdx]; if(s)pick(s);
+  }else if(e.key==='Escape'){ac.hidden=true;}
+});
+ac.addEventListener('click',function(e){
+  var d=e.target.closest('div[data-i]'); if(d) pick(acRows[+d.dataset.i]);
+});
+document.addEventListener('click',function(e){ if(!e.target.closest('.search')) ac.hidden=true; });
+function pick(s){ ac.hidden=true; q.value=''; select(s.c||s.n); }
+
+/* ───────── 상태 ───────── */
+var CUR=null, A=null;
+
+function select(key){
+  var s=BYCODE[key]||STOCKS.filter(function(x){return x.n===key})[0]||null;
+  var prof=PROFILES[key]||(s&&PROFILES[s.c])||null;
+  if(!s&&!prof) return;
+  CUR={key:key,stock:s,prof:prof,isPref:!!(PROFILES[key]&&PROFILES[key].isPref)};
+  try{ if(/^[0-9A-Z]{6}$/.test(key)) location.hash=key; }catch(e){}
+  A=initAssumptions(CUR);
+  document.getElementById('app').hidden=false;
+  renderHead(); renderHist(); renderPolicy(); renderAsm(); renderResults();
+}
+
+function initAssumptions(c){
+  var p=c.prof, y0=new Date().getFullYear();
+  var a={y0:y0,engine:p?p.engine:'payout',shares:p?p.shares:10000000,prem:p?p.prem:0,
+         pxC:p?p.pxC:0,pxP:p?p.pxP:0,
+         ni:[0,0,0],payout:[25,25,25],pool:[1,1,1],
+         dpsFloor:p&&p.dpsFloor?p.dpsFloor:0,mcPct:[1,1,1],cash:[50,50,50],
+         mcap:p&&p.mcap?p.mcap:0,ocfMult:1.25,capex:[0,0,0],fcfPct:[50,50,50]};
+  if(p){
+    if(p.ni) a.ni=p.ni.slice();
+    if(p.payout) a.payout=p.payout.slice();
+    if(p.pool) a.pool=p.pool.slice();
+    if(p.mcPct) a.mcPct=p.mcPct.slice();
+    if(p.cash) a.cash=p.cash.slice();
+  }else if(c.stock&&c.stock.d){
+    // 프로파일이 없으면 최근 배당성향을 초기값으로 쓴다
+    var yrs=Object.keys(c.stock.d).sort(), last=yrs[yrs.length-1];
+    var po=last&&c.stock.d[last][2];
+    if(po!=null&&po>0&&po<3) a.payout=[po*100,po*100,po*100];
+  }
+  return a;
+}
+
+/* ───────── 01 종목 헤드 ───────── */
+function renderHead(){
+  var p=CUR.prof, name=CUR.isPref?p.prefName:(p?p.name:CUR.stock.n);
+  var code=CUR.isPref?CUR.key:(CUR.stock?CUR.stock.c:(p?CUR.key:''));
+  document.getElementById('sName').textContent=name;
+  document.getElementById('sCode').textContent=code||'코드 미확인';
+  var e=document.getElementById('sEng');
+  e.textContent=ENGINES[A.engine].label; e.className='chip on';
+  var pr=document.getElementById('sProf');
+  pr.textContent=p?'DART 공시 확인':'정책 미조사 — 직접 입력';
+  pr.className='chip'+(p?' on':'');
+}
+
+/* ───────── 01 과거 배당 ───────── */
+function renderHist(){
+  var s=CUR.stock, tb=document.getElementById('histBody'), yrs=[2021,2022,2023,2024,2025];
+  if(s&&!s.d) s={c:s.c,n:s.n,a:s.a,d:{}};
+  var rows=[['주당배당금 (원)',0,0],['배당수익률 (%)',1,2],['배당성향 (%)',2,1]];
+  if(!s||!Object.keys(s.d).length){
+    tb.innerHTML='<tr><td colspan="6" class="muted">2021–2025 배당 이력이 없는 종목입니다(무배당이거나 데이터셋 미수록). 아래 가정 입력으로 계산은 그대로 가능합니다.</td></tr>';
+    document.getElementById('histSub').textContent='배당이력 없음';
+  }else{
+    tb.innerHTML=rows.map(function(r){
+      return '<tr><td>'+r[0]+'</td>'+yrs.map(function(y){
+        var v=s.d[y]?s.d[y][r[1]]:null;
+        if(v==null) return '<td class="num muted">—</td>';
+        if(r[1]===2) v=v*100;                       // 배당성향은 비율로 저장됨
+        var odd=(r[1]===2&&(v>200||v<0));           // 원본 노이즈는 흐리게
+        return '<td class="num'+(v<0?' neg':'')+(odd?' muted':'')+'"'+(odd?' title="원본 데이터 이상치"':'')+'>'+fmt(v,r[2])+'</td>';
+      }).join('')+'</tr>';
+    }).join('');
+    document.getElementById('histSub').textContent='보유 데이터셋 2021–2025 확정치';
+  }
+  var n=document.getElementById('histNote');
+  if(CUR.prof&&CUR.prof.verdict){ n.hidden=false; n.textContent=CUR.prof.verdict; }
+  else { n.hidden=false; n.textContent='배당수익률은 집계 시점 주가 기준이라 DART의 시가배당률(배당결정일 직전 1주일 평균가 기준)과 다릅니다. 배당성향이 빈 해는 적자이거나 원본에 값이 없는 해입니다.'; }
+}
+
+/* ───────── 02 정책 ───────── */
+function renderPolicy(){
+  var pick=document.getElementById('engPick');
+  pick.innerHTML=Object.keys(ENGINES).map(function(k){
+    return '<label class="'+(k===A.engine?'sel':'')+'" title="'+ENGINES[k].hint+'">'+
+      '<input type="radio" name="eng" value="'+k+'" '+(k===A.engine?'checked':'')+'>'+ENGINES[k].label+'</label>';
+  }).join('');
+  pick.onchange=function(e){ if(e.target.name==='eng'){ A.engine=e.target.value; renderHead(); renderPolicy(); renderAsm(); renderResults(); } };
+
+  var p=CUR.prof, b=document.getElementById('polBody'), h='';
+  h+='<p class="hint" style="margin:0 0 12px">'+ENGINES[A.engine].hint+'</p>';
+  if(p&&p.policy){
+    h+=p.policy.map(function(r){
+      return '<blockquote><p><b class="num">'+r[0]+'</b> · '+r[1]+'</p><p>'+r[2]+'</p>'+
+        '<p class="src"><a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo='+r[3]+'" target="_blank" rel="noopener">DART 원문 열기 ↗</a></p></blockquote>';
+    }).join('');
+    if(p.extra) h+='<div class="warnbox">'+p.extra+'</div>';
+  }else{
+    h+='<div class="warnbox">이 종목은 아직 DART 공시를 읽어 프로파일로 만들어 두지 않았습니다. 위에서 정책 유형을 고르고 아래 값을 직접 넣으면 계산은 동일하게 돌아갑니다. 공시 원문은 아래 “DART 원문 확인” 링크에서 확인하세요.</div>';
+  }
+  b.innerHTML=h;
+}
+
+/* ───────── 03 가정 입력 ───────── */
+function fld(label,unit,id,val,step){
+  return '<div class="fld"><label for="'+id+'">'+label+'<span class="u"> '+unit+'</span></label>'+
+    '<input id="'+id+'" type="number" step="'+(step||'any')+'" value="'+(val==null?'':val)+'"></div>';
+}
+function renderAsm(){
+  var a=A, y=[a.y0,a.y0+1,a.y0+2], host=document.getElementById('asm'), h='';
+  var p=CUR.prof;
+  document.getElementById('asmSub').textContent=p&&p.halfLabel?p.halfLabel:'모든 값은 직접 수정할 수 있습니다';
+
+  // 공통
+  h+='<div class="fs"><h3>공통</h3><div class="grid">'+
+    fld('배당대상 주식수','주','f_sh',a.shares,1)+
+    fld('우선주 가산','원','f_pr',a.prem)+
+    fld('보통주 주가','원','f_pc',a.pxC)+
+    fld('우선주 주가','원','f_pp',a.pxP)+
+    '</div>'+
+    (p?'<p class="hint" style="margin:10px 0 0">주가 기준일 '+p.pxDate+' — 최신가로 직접 바꿔 넣으세요.</p>':'')+
+    '</div>';
+
+  if(a.engine==='payout'){
+    h+='<div class="fs"><h3>지배주주순이익 가정</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy,'억원','f_ni'+i,a.ni[i])}).join('')+'</div></div>';
+    h+='<div class="fs"><h3>적용 배당성향</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy,'%','f_po'+i,a.payout[i],0.1)}).join('')+'</div></div>';
+  }else if(a.engine==='pool'){
+    h+='<div class="fs"><h3>연간 배당총액 약정</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy,'조원','f_pl'+i,a.pool[i],0.1)}).join('')+'</div>'+
+      '<p class="hint" style="margin:10px 0 0">총액 약정형은 이익과 무관합니다. 아래 순이익은 배당성향 참고치 계산에만 쓰입니다.</p></div>';
+    h+='<div class="fs"><h3>지배주주순이익 (참고용)</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy,'억원','f_ni'+i,a.ni[i])}).join('')+'</div></div>';
+  }else if(a.engine==='floor'){
+    h+='<div class="fs"><h3>공시 정책 값</h3><div class="grid">'+
+      fld('주당 최소배당금','원','f_fl',a.dpsFloor)+
+      fld('시가총액','억원','f_mc',a.mcap)+'</div></div>';
+    h+='<div class="fs"><h3>시총 연동 추가환원</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy+' 환원율','%','f_mp'+i,a.mcPct[i],0.1)}).join('')+'</div>'+
+      '<div class="grid" style="margin-top:12px">'+
+      y.map(function(yy,i){return fld('FY'+yy+' 현금배당 비중','%','f_cs'+i,a.cash[i],1)}).join('')+'</div>'+
+      '<p class="hint" style="margin:10px 0 0">정책이 “자기주식 매입·소각 <b>또는</b> 추가배당”이라 현금배당 비중은 회사 선택입니다. 100%면 전액 현금배당, 0%면 전액 자사주.</p></div>';
+    h+='<div class="fs"><h3>순이익 (배당성향 참고치)</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy,'억원','f_ni'+i,a.ni[i])}).join('')+'</div></div>';
+  }else{
+    h+='<div class="fs"><h3>순이익 · 현금흐름 가정</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy+' 순이익','억원','f_ni'+i,a.ni[i])}).join('')+
+      fld('영업CF / 순이익','배','f_om',a.ocfMult,0.01)+'</div>'+
+      '<div class="grid" style="margin-top:12px">'+
+      y.map(function(yy,i){return fld('FY'+yy+' CAPEX','억원','f_cx'+i,a.capex[i])}).join('')+'</div></div>';
+    h+='<div class="fs"><h3>환원 정책</h3><div class="grid">'+
+      y.map(function(yy,i){return fld('FY'+yy+' FCF 환원율','%','f_fp'+i,a.fcfPct[i],1)}).join('')+'</div>'+
+      '<div class="grid" style="margin-top:12px">'+
+      y.map(function(yy,i){return fld('FY'+yy+' 현금배당 비중','%','f_cs'+i,a.cash[i],1)}).join('')+'</div></div>';
+  }
+
+  if(p&&p.target){
+    h+='<div class="fs"><h3>'+p.target.label+'</h3><p class="hint" style="margin:0 0 10px">'+p.target.text+'</p>'+
+      '<button id="applyTarget">이 목표치를 FY'+(a.y0+1)+'·FY'+(a.y0+2)+'에 적용</button></div>';
+  }
+  host.innerHTML=h;
+  if(!host.dataset.bound){ host.addEventListener('input',onAsmInput); host.dataset.bound='1'; }
+  var bt=document.getElementById('applyTarget');
+  if(bt) bt.onclick=function(){
+    var t=CUR.prof.target;
+    if(t.ni){ A.ni[1]=t.ni; A.ni[2]=t.ni; }
+    if(t.payout){ A.payout=[t.payout,t.payout,t.payout]; }
+    renderAsm(); renderResults();
+  };
+}
+function val(id,dflt){ var el=document.getElementById(id); if(!el)return dflt; var v=parseFloat(el.value); return isFinite(v)?v:dflt; }
+function onAsmInput(){
+  var a=A;
+  a.shares=Math.max(1,val('f_sh',a.shares)); a.prem=val('f_pr',a.prem);
+  a.pxC=val('f_pc',a.pxC); a.pxP=val('f_pp',a.pxP);
+  for(var i=0;i<3;i++){
+    a.ni[i]=val('f_ni'+i,a.ni[i]);
+    a.payout[i]=val('f_po'+i,a.payout[i]);
+    a.pool[i]=val('f_pl'+i,a.pool[i]);
+    a.mcPct[i]=val('f_mp'+i,a.mcPct[i]);
+    a.cash[i]=val('f_cs'+i,a.cash[i]);
+    a.capex[i]=val('f_cx'+i,a.capex[i]);
+    a.fcfPct[i]=val('f_fp'+i,a.fcfPct[i]);
+  }
+  a.dpsFloor=val('f_fl',a.dpsFloor); a.mcap=val('f_mc',a.mcap); a.ocfMult=val('f_om',a.ocfMult);
+  renderResults();
+}
+
+/* ───────── 04 결과 ───────── */
+function renderResults(){
+  var rows=compute(A), a=A;
+  var showPref=a.prem>0||a.pxP>0;
+  document.getElementById('resSub').textContent='주가 '+fmt(a.pxC)+'원 기준 · 배당대상 '+fmt(a.shares)+'주';
+
+  var k=document.getElementById('kpis'), tgt=CUR.isPref?'우선주':'보통주';
+  var px=CUR.isPref?a.pxP:a.pxC;
+  var anyTotal=rows.some(function(r){return r.total>0});
+  if(!anyTotal||!(px>0)){
+    k.innerHTML='<div class="kpi" style="grid-column:1/-1"><div class="k">계산 준비</div>'+
+      '<div class="s" style="font-family:var(--f-body);font-size:13px;margin-top:6px">'+
+      (anyTotal?'':'배당 재원 값(순이익·배당총액·하한 등)을 입력하세요. ')+
+      (px>0?'':'그리고 '+tgt+' 주가를 입력하면 수익률이 나옵니다.')+'</div></div>';
+    document.getElementById('resBody').innerHTML=rows.map(function(r){
+      return '<tr><td class="num">FY'+r.year+'</td><td class="num muted">'+r.basis+'</td>'+
+        '<td class="num">'+(r.total>0?fmt(eok(r.total))+'억':'<span class="muted">—</span>')+'</td>'+
+        '<td class="num">'+(r.dpsC>0?fmt(r.dpsC):'<span class="muted">—</span>')+'</td>'+
+        '<td class="num">'+pct(r.yC)+'</td><td class="num">'+(r.dpsP>0?fmt(r.dpsP):'<span class="muted">—</span>')+'</td>'+
+        '<td class="num">'+pct(r.yP)+'</td></tr>';
+    }).join('');
+    renderSens(); renderVerify(); return;
+  }
+  k.innerHTML=rows.map(function(r){
+    var y=CUR.isPref?r.yP:r.yC, d=CUR.isPref?r.dpsP:r.dpsC;
+    return '<div class="kpi"><div class="k">FY'+r.year+' '+tgt+' 예상 배당수익률</div>'+
+      '<div class="v"><span class="band '+band(y||0)+'"></span>'+pct(y)+'</div>'+
+      '<div class="s">DPS '+fmt(d)+'원</div></div>';
+  }).join('');
+
+  document.getElementById('resBody').innerHTML=rows.map(function(r){
+    var po=r.ni>0?(r.total/EOK)/r.ni*100:null;
+    return '<tr><td class="num">FY'+r.year+'</td><td class="num muted">'+r.basis+'</td>'+
+      '<td class="num">'+fmt(eok(r.total))+'억'+(po?' <span class="muted">('+pct(po,1)+')</span>':'')+'</td>'+
+      '<td class="num">'+fmt(r.dpsC)+'</td><td class="num">'+pct(r.yC)+'</td>'+
+      (showPref?'<td class="num">'+fmt(r.dpsP)+'</td><td class="num">'+pct(r.yP)+'</td>':'<td class="num muted">—</td><td class="num muted">—</td>')+
+      '</tr>';
+  }).join('');
+
+  renderSens();
+  renderVerify();
+}
+
+/* 민감도: 엔진별 핵심 변수를 흔든다 */
+function renderSens(){
+  var a=A, spec;
+  if(a.engine==='payout')      spec={label:'배당성향(%)',vals:[a.payout[0]*0.8,a.payout[0]*0.9,a.payout[0],a.payout[0]*1.1,a.payout[0]*1.25],apply:function(c,v){c.payout=[v,v,v]},d:1};
+  else if(a.engine==='pool')   spec={label:'연간 배당총액(조원)',vals:[a.pool[0],a.pool[0]*1.5,a.pool[0]*2,a.pool[0]*3,a.pool[0]*4.5],apply:function(c,v){c.pool=[v,v,v]},d:1};
+  else if(a.engine==='floor')  spec={label:'현금배당 비중(%)',vals:[0,25,50,75,100],apply:function(c,v){c.cash=[v,v,v]},d:0};
+  else                         spec={label:'FCF 환원율(%)',vals:[25,35,50,65,80],apply:function(c,v){c.fcfPct=[v,v,v]},d:0};
+
+  var head=document.getElementById('sensHead'), body=document.getElementById('sensBody');
+  head.innerHTML='<th>'+spec.label+'</th>'+[0,1,2].map(function(i){return '<th class="num">FY'+(a.y0+i)+' DPS</th><th class="num">수익률</th>'}).join('');
+  body.innerHTML=spec.vals.map(function(v){
+    var c=JSON.parse(JSON.stringify(a)); spec.apply(c,v);
+    var rs=compute(c);
+    return '<tr><td class="num">'+fmt(v,spec.d)+'</td>'+rs.map(function(r){
+      var dd=CUR.isPref?r.dpsP:r.dpsC, yy=CUR.isPref?r.yP:r.yC;
+      return '<td class="num">'+fmt(dd)+'</td><td class="num">'+pct(yy)+'</td>';
+    }).join('')+'</tr>';
+  }).join('');
+  document.getElementById('sensNote').textContent=
+    (CUR.isPref?'우선주':'보통주')+' 기준 · 나머지 가정은 위 입력값 그대로 고정하고 '+spec.label+'만 변화시킨 결과입니다.';
+}
+
+function renderVerify(){
+  var code=CUR.stock?CUR.stock.c:CUR.key;
+  var name=CUR.stock?CUR.stock.n:(CUR.prof?CUR.prof.name:'');
+  var base=code?code.replace(/.$/,'0'):'';
+  var h='';
+  h+='<p class="hint" style="margin:0 0 10px">이 페이지의 계산은 투명하지만 공시 원문은 직접 보셔야 합니다. 브라우저에서는 보안 정책(CORS) 때문에 DART·거래소 API를 직접 호출할 수 없어, 과거 배당만 내장하고 주가는 입력으로 받습니다.</p>';
+  h+='<p class="src"><a href="https://dart.fss.or.kr/dsab007/main.do?textCrpNm='+encodeURIComponent(name)+'" target="_blank" rel="noopener">DART 공시 검색 — '+name+' ↗</a></p>';
+  if(CUR.prof&&CUR.prof.policy){
+    h+='<p class="src">'+CUR.prof.policy.map(function(r){
+      return '<a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo='+r[3]+'" target="_blank" rel="noopener">'+r[0]+' '+r[1]+' ↗</a>';
+    }).join(' · ')+'</p>';
+  }
+  h+='<p class="hint" style="margin:14px 0 0">같은 계산을 내 PC에서 DART를 직접 읽어 돌리려면:</p>';
+  h+='<pre>python dividend_model.py '+(base||'종목코드')+' --half-mult 1.5 --fwd-mult 1.0 1.0</pre>';
+  h+='<p class="hint" style="margin:8px 0 0">총액 약정형은 <code>--pool 2026=9.8 2027=9.8</code>, DPS 하한형은 <code>--shares</code>로 배당대상 주식수를 직접 지정하세요.</p>';
+  document.getElementById('verify').innerHTML=h;
+}
+
+window.addEventListener('hashchange',function(){
+  var h=location.hash.replace(/^#/,''); if(/^[0-9A-Z]{6}$/.test(h)&&(!CUR||CUR.key!==h)) select(h);
+});
+</script>
+
+</body>
+</html>
