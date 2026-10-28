@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>divfw 배당 워크벤치</title>
-<meta name="description" content="한국 상장기업 예상배당 워크벤치 — 과거 배당흐름, 공시된 배당정책, 이익 가정으로 향후 3개년 주당배당금과 배당수익률을 계산합니다.">
+<meta name="description" content="한국 상장사의 과거 배당 이력(DART 사업보고서 직접조회), 공시된 배당정책, 향후 이익 가정을 엮어 올해·내년·후년의 주당배당금과 배당수익률을 추정하는 워크벤치.">
 <meta name="color-scheme" content="light dark">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -315,8 +315,8 @@ document.getElementById('pcount').textContent=Object.keys(PROFILES).length;
 var STOCKS=[],BYCODE={};
 fetch('stocks.json').then(function(r){return r.json()}).then(function(j){
   STOCKS=j; j.forEach(function(s){ if(s.c) BYCODE[s.c]=s; });
-  var nd=0; j.forEach(function(x){ if(x.d) nd++; });
-  document.getElementById('hint').innerHTML='상장 <b>'+fmt(STOCKS.length)+'</b> 종목 검색 · 2021–2025 배당이력 보유 <b>'+fmt(nd)+'</b>종목 · DART 공시 확인 프로파일 <b>'+Object.keys(PROFILES).length+'</b>건';
+  var nd=0,nk=0; j.forEach(function(x){ if(x.d) nd++; if(x.k===1) nk++; });
+  document.getElementById('hint').innerHTML='상장 <b>'+fmt(STOCKS.length)+'</b> 종목 검색 · DART 사업보고서 직접조회 <b>'+fmt(nk)+'</b>종목(시총 상위) · 2021–2025 배당이력 <b>'+fmt(nd)+'</b>종목 · 정책 프로파일 <b>'+Object.keys(PROFILES).length+'</b>건';
   var h=location.hash.replace(/^#/,'');
   if(/^[0-9A-Z]{6}$/.test(h)) select(h); else select('071050');
 }).catch(function(){
@@ -417,9 +417,12 @@ function initAssumptions(c){
     if(p.cash) a.cash=p.cash.slice();
   }else if(c.stock&&c.stock.d){
     // 프로파일이 없으면 최근 배당성향을 초기값으로 쓴다
-    var yrs=Object.keys(c.stock.d).sort(), last=yrs[yrs.length-1];
-    var po=last&&c.stock.d[last][2];
-    if(po!=null&&po>0&&po<3) a.payout=[po*100,po*100,po*100];
+    var yrs=Object.keys(c.stock.d).sort(), po=null;
+    for(var i=yrs.length-1;i>=0;i--){
+      var v=c.stock.d[yrs[i]][2];
+      if(v!=null&&v>0&&v<3){ po=v; break; }   // 최근 '정상' 배당성향을 초기값으로
+    }
+    if(po!=null) a.payout=[po*100,po*100,po*100];
   }
   return a;
 }
@@ -442,9 +445,15 @@ function renderHist(){
   var s=CUR.stock, tb=document.getElementById('histBody'), yrs=[2021,2022,2023,2024,2025];
   if(s&&!s.d) s={c:s.c,n:s.n,a:s.a,d:{}};
   var rows=[['주당배당금 (원)',0,0],['배당수익률 (%)',1,2],['배당성향 (%)',2,1]];
+  var dartChecked=!!(s&&s.k===1);
   if(!s||!Object.keys(s.d).length){
-    tb.innerHTML='<tr><td colspan="6" class="muted">2021–2025 배당 이력이 없는 종목입니다(무배당이거나 데이터셋 미수록). 아래 가정 입력으로 계산은 그대로 가능합니다.</td></tr>';
-    document.getElementById('histSub').textContent='배당이력 없음';
+    if(dartChecked){
+      tb.innerHTML='<tr><td colspan="6" class="muted">DART 사업보고서 「배당에 관한 사항」을 2021–2025 전 사업연도 직접 조회한 결과 <b>현금배당 기록이 없습니다</b>. 무배당 종목입니다. 아래 가정 입력으로 계산은 그대로 가능합니다.</td></tr>';
+      document.getElementById('histSub').textContent='무배당 (DART 직접조회 확인)';
+    }else{
+      tb.innerHTML='<tr><td colspan="6" class="muted">아직 <b>조회하지 않은</b> 종목입니다. 현재 데이터셋은 시가총액 상위 1,000종목을 DART에서 직접 조회해 수록했고, 그 밖의 종목은 보유 엑셀에 있는 경우만 표시됩니다. 무배당이라는 뜻이 아닙니다. 아래 가정 입력으로 계산은 그대로 가능합니다.</td></tr>';
+      document.getElementById('histSub').textContent='미조회 (배당 여부 미확인)';
+    }
   }else{
     tb.innerHTML=rows.map(function(r){
       return '<tr><td>'+r[0]+'</td>'+yrs.map(function(y){
@@ -455,11 +464,16 @@ function renderHist(){
         return '<td class="num'+(v<0?' neg':'')+(odd?' muted':'')+'"'+(odd?' title="원본 데이터 이상치"':'')+'>'+fmt(v,r[2])+'</td>';
       }).join('')+'</tr>';
     }).join('');
-    document.getElementById('histSub').textContent='보유 데이터셋 2021–2025 확정치';
+    document.getElementById('histSub').textContent=dartChecked?'DART 사업보고서 직접조회 · 2021–2025 확정치':'보유 엑셀 데이터셋 · 2021–2025 (DART 미조회)';
   }
   var n=document.getElementById('histNote');
   if(CUR.prof&&CUR.prof.verdict){ n.hidden=false; n.textContent=CUR.prof.verdict; }
-  else { n.hidden=false; n.textContent='배당수익률은 집계 시점 주가 기준이라 DART의 시가배당률(배당결정일 직전 1주일 평균가 기준)과 다릅니다. 배당성향이 빈 해는 적자이거나 원본에 값이 없는 해입니다.'; }
+  else {
+    n.hidden=false;
+    n.textContent=dartChecked
+      ? 'DART 사업보고서 「배당에 관한 사항」 원문 수치입니다. 배당수익률은 시가배당률(배당결정일 직전 1주일 평균가 기준)이라 종가 기준 수익률과 다릅니다. 배당성향이 빈 해는 적자이거나 공시에 값이 없는 해입니다.'
+      : '보유 엑셀 데이터셋 수치입니다(DART 직접조회 전). 배당수익률은 집계 시점 주가 기준이라 DART 시가배당률과 다릅니다. 배당성향이 빈 해는 적자이거나 원본에 값이 없는 해입니다.';
+  }
 }
 
 /* ───────── 02 정책 ───────── */
@@ -658,6 +672,5 @@ window.addEventListener('hashchange',function(){
   var h=location.hash.replace(/^#/,''); if(/^[0-9A-Z]{6}$/.test(h)&&(!CUR||CUR.key!==h)) select(h);
 });
 </script>
-
 </body>
 </html>
