@@ -443,10 +443,11 @@ function renderHead(){
 /* ───────── 01 과거 배당 ───────── */
 function renderHist(){
   var s=CUR.stock, tb=document.getElementById('histBody'), yrs=[2021,2022,2023,2024,2025];
-  if(s&&!s.d) s={c:s.c,n:s.n,a:s.a,d:{}};
+  var dartChecked=!!(s&&s.k===1);   // 시총 상위 1,000종목: DART 전 사업연도 직접조회 완료
+  if(s&&!s.d) s={c:s.c,n:s.n,a:s.a,k:s.k,d:{}};
   var rows=[['주당배당금 (원)',0,0],['배당수익률 (%)',1,2],['배당성향 (%)',2,1]];
-  var dartChecked=!!(s&&s.k===1);
-  if(!s||!Object.keys(s.d).length){
+  var hasHist=!!(s&&Object.keys(s.d).length);
+  if(!hasHist){
     if(dartChecked){
       tb.innerHTML='<tr><td colspan="6" class="muted">DART 사업보고서 「배당에 관한 사항」을 2021–2025 전 사업연도 직접 조회한 결과 <b>현금배당 기록이 없습니다</b>. 무배당 종목입니다. 아래 가정 입력으로 계산은 그대로 가능합니다.</td></tr>';
       document.getElementById('histSub').textContent='무배당 (DART 직접조회 확인)';
@@ -468,6 +469,12 @@ function renderHist(){
   }
   var n=document.getElementById('histNote');
   if(CUR.prof&&CUR.prof.verdict){ n.hidden=false; n.textContent=CUR.prof.verdict; }
+  else if(!hasHist){
+    n.hidden=false;
+    n.textContent=dartChecked
+      ? '무배당은 조회 결과입니다. 배당을 시작하면 이 표에 나타납니다.'
+      : '시총 상위 1,000종목 밖이라 아직 DART를 조회하지 않았습니다. 요청하면 이 종목도 조회해 수록할 수 있습니다.';
+  }
   else {
     n.hidden=false;
     n.textContent=dartChecked
