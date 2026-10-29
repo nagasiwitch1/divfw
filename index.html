@@ -316,7 +316,7 @@ var STOCKS=[],BYCODE={};
 fetch('stocks.json').then(function(r){return r.json()}).then(function(j){
   STOCKS=j; j.forEach(function(s){ if(s.c) BYCODE[s.c]=s; });
   var nd=0,nk=0; j.forEach(function(x){ if(x.d) nd++; if(x.k===1) nk++; });
-  document.getElementById('hint').innerHTML='상장 <b>'+fmt(STOCKS.length)+'</b> 종목 검색 · DART 사업보고서 직접조회 <b>'+fmt(nk)+'</b>종목(시총 상위) · 2021–2025 배당이력 <b>'+fmt(nd)+'</b>종목 · 정책 프로파일 <b>'+Object.keys(PROFILES).length+'</b>건';
+  document.getElementById('hint').innerHTML='코스피·코스닥 상장 <b>'+fmt(STOCKS.length)+'</b> 종목(2026-10-29 기준) · DART 사업보고서 직접조회 <b>'+fmt(nk)+'</b>종목(시총 상위) · 2021–2025 배당이력 <b>'+fmt(nd)+'</b>종목 · 정책 프로파일 <b>'+Object.keys(PROFILES).length+'</b>건';
   var h=location.hash.replace(/^#/,'');
   if(/^[0-9A-Z]{6}$/.test(h)) select(h); else select('071050');
 }).catch(function(){
